@@ -1,25 +1,24 @@
-// ---------------- Video Cycling ----------------
-
-// Store pending video cycles for when API loads
 const pendingVideoCycles = [];
+const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzVwZEKQjeQ9iS38FORd7lGlcx7E4l1xOap_jJbdTY0oMuW9qblYaKYW3P0QcI-D69-/exec";
 
-function setupVideoCycle(sectionSelector, interval = 20000) {
+function setupVideoCycle(sectionSelector) {
   const section = document.querySelector(sectionSelector);
   if (!section) return;
 
   const frames = Array.from(section.querySelectorAll('.video-frame'));
   if (!frames.length) return;
 
+  const logo = section.querySelector('.cycle-logo');
   let index = 0;
   const players = [];
 
-  // Assign unique IDs and initial opacity
   frames.forEach((frame, i) => {
     if (!frame.id) frame.id = `yt-player-${Math.random().toString(36).substr(2, 9)}`;
-    frame.style.opacity = i === 0 ? 1 : 0;
+    frame.style.opacity = 0;
   });
 
-  // Save initializer until YouTube API loads
+  frames[0].style.opacity = 1;
+
   pendingVideoCycles.push(() => {
     frames.forEach((frame, i) => {
       players[i] = new YT.Player(frame.id, {
@@ -31,79 +30,87 @@ function setupVideoCycle(sectionSelector, interval = 20000) {
       });
     });
 
-    // Cycle videos every 'interval' milliseconds
-    setInterval(() => {
-      players[index]?.pauseVideo();
-      frames[index].style.opacity = 0;
+    function cycleVideos() {
+      const current = index;
+      const next = (index + 1) % frames.length;
 
-      index = (index + 1) % frames.length;
+      // Smooth fade out current video
+      frames[current].style.transition = "opacity 2s ease-in-out";
+      frames[current].style.opacity = 0;
 
-      frames[index].style.opacity = 1;
-      players[index]?.playVideo();
-    }, interval);
+      // Smooth logo fade in
+      if (logo) {
+        logo.style.transition = "opacity 1.5s ease-in-out, transform 1.5s ease-in-out";
+        logo.style.opacity = 1;
+        logo.style.transform = "translate(-50%, -50%) scale(1.2) rotate(0deg)";
+      }
+
+      // After 3s show next video
+      setTimeout(() => {
+        frames[next].style.transition = "opacity 2s ease-in-out";
+        frames[next].style.opacity = 1;
+        players[next]?.playVideo();
+
+        // Smooth logo fade out
+        if (logo) {
+          logo.style.opacity = 0;
+          logo.style.transform = "translate(-50%, -50%) scale(0.8) rotate(-10deg)";
+        }
+
+        index = next;
+
+        // Repeat cycle after 28s of video playback
+        setTimeout(cycleVideos, 28000);
+      }, 3000); // 3s logo display
+    }
+
+    setTimeout(cycleVideos, 28000);
   });
 }
 
-// ---------------- YouTube API Callback ----------------
+// YouTube API
 window.onYouTubeIframeAPIReady = function () {
   pendingVideoCycles.forEach(init => init());
 };
 
-// ---------------- DOMContentLoaded ----------------
-const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzVwZEKQjeQ9iS38FORd7lGlcx7E4l1xOap_jJbdTY0oMuW9qblYaKYW3P0QcI-D69-/exec";
-
 document.addEventListener("DOMContentLoaded", () => {
-
-  // Load YouTube API once
   if (!window.YT) {
     const tag = document.createElement("script");
     tag.src = "https://www.youtube.com/iframe_api";
     document.body.appendChild(tag);
   }
 
-  // Initialize all video cycles
   document.querySelectorAll(".samples").forEach((section, i) => {
-    setupVideoCycle(`.samples:nth-child(${i + 1})`, 20000);
+    setupVideoCycle(`.samples:nth-child(${i + 1})`);
   });
 
-  // Playlist links
   const playlistLinks = {
-    "Promote the Brand":
-      "https://youtube.com/playlist?list=PLLDO58AOnWdXisVF_9A4K5OlRAMx2jqg7&si=hDqBRY96TSuLWWwK",
-    "Celebrate the Day":
-      "https://youtube.com/playlist?list=PLLDO58AOnWdXacw6-Jivj5QtjT3loJOgX&si=MYPOyO2dTn6muyU7",
-    "Record the Action":
-      "https://youtube.com/playlist?list=PLLDO58AOnWdXJRqiOr9416VvSM2hICYmW&si=PAgeF66EU26LTWy0",
+    "Promote the Brand": "https://youtube.com/playlist?list=PLLDO58AOnWdXisVF_9A4K5OlRAMx2jqg7&si=hDqBRY96TSuLWWwK",
+    "Celebrate the Day": "https://youtube.com/playlist?list=PLLDO58AOnWdXacw6-Jivj5QtjT3loJOgX&si=MYPOyO2dTn6muyU7",
+    "Record the Action": "https://youtube.com/playlist?list=PLLDO58AOnWdXJRqiOr9416VvSM2hICYmW&si=PAgeF66EU26LTWy0",
   };
 
-  // Make entire sample card clickable
   document.querySelectorAll(".samples").forEach(card => {
     card.addEventListener("click", () => {
       const eventType = card.dataset.type;
-
-      // Autofill event type
       const select = document.getElementById("eventType");
       select.value = eventType;
       document.getElementById("booking").scrollIntoView({ behavior: "smooth" });
       select.focus();
 
-      // Highlight effect
       card.style.boxShadow = "0 0 25px #ffffff";
       setTimeout(() => card.style.boxShadow = "", 800);
 
-      // Open playlist in new tab
       window.open(playlistLinks[eventType], "_blank");
     });
   });
 
-  // Form submission
   const form = document.getElementById("quickBookingForm");
   const status = document.getElementById("status");
   const popup = document.getElementById("popup");
 
   form.addEventListener("submit", async e => {
     e.preventDefault();
-
     const data = {
       name: document.getElementById("name").value.trim(),
       email: document.getElementById("email").value.trim(),
